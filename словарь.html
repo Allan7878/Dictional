@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Словарь</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button, input[type="file"]::file-selector-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        button:hover, input[type="file"]::file-selector-button:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #2c3e50; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        .actions { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Редактор словаря</h1>
+
+    <div class="controls">
+        <div>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+        <div>
+            <button class="btn-success" onclick="addWord()">+ Добавить слово</button>
+            <button onclick="downloadDictionary()">Скачать словарь</button>
+            <button class="btn-danger" onclick="clearDictionary()">Очистить всё</button>
+        </div>
+    </div>
+
+    <table id="dictionaryTable">
+        <thead>
+            <tr>
+                <th>Слово (Термин)</th>
+                <th>Перевод (Значение)</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <!-- Сюда будут добавляться слова -->
+        </tbody>
+    </table>
+
+    <script>
+        let dictionary = [];
+
+        // Загрузка данных из локального хранилища при открытии страницы
+        window.onload = () => {
+            const savedData = localStorage.getItem('myDictionary');
+            if (savedData) {
+                dictionary = JSON.parse(savedData);
+                renderTable();
+            }
+        };
+
+        // Сохранение в память браузера
+        function saveToLocal() {
+            localStorage.setItem('myDictionary', JSON.stringify(dictionary));
+        }
+
+        // Отрисовка таблицы
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            dictionary.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.term}</td>
+                    <td>${item.definition}</td>
+                    <td class="actions">
+                        <button onclick="editWord(${index})">Изменить</button>
+                        <button class="btn-danger" onclick="deleteWord(${index})">Удалить</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            saveToLocal();
+        }
+
+        // Добавление слова
+        function addWord() {
+            const term = prompt("Введите слово (термин):");
+            if (!term) return;
+            const definition = prompt("Введите перевод (значение):");
+            if (!definition) return;
+
+            dictionary.push({ term, definition });
+            renderTable();
+        }
+
+        // Редактирование слова
+        function editWord(index) {
+            const newTerm = prompt("Изменить слово:", dictionary[index].term);
+            if (newTerm === null) return;
+            const newDef = prompt("Изменить перевод:", dictionary[index].definition);
+            if (newDef === null) return;
+
+            dictionary[index] = { term: newTerm, definition: newDef };
+            renderTable();
+        }
+
+        // Удаление слова
+        function deleteWord(index) {
+            if (confirm("Точно удалить это слово?")) {
+                dictionary.splice(index, 1);
+                renderTable();
+            }
+        }
+
+        // Очистка словаря
+        function clearDictionary() {
+            if (confirm("Вы уверены, что хотите удалить ВСЕ слова?")) {
+                dictionary = [];
+                renderTable();
+            }
+        }
+
+        // Загрузка файла JSON
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    // Простая проверка формата
+                    if (Array.isArray(json) && json[0] && json[0].term !== undefined) {
+                        dictionary = json;
+                        renderTable();
+                        alert("Словарь успешно загружен!");
+                    } else {
+                        alert("Неверный формат JSON файла.");
+                    }
+                } catch (error) {
+                    alert("Ошибка чтения файла. Убедитесь, что это корректный JSON.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Скачивание словаря
+        function downloadDictionary() {
+            if (dictionary.length === 0) {
+                alert("Словарь пуст, нечего скачивать.");
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dictionary, null, 4));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", "dictionary.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+    </script>
+</body>
+</html>
